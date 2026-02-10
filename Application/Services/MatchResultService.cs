@@ -5,6 +5,7 @@ using Domain.Models;
 using Application.Interfaces;
 using Application.Responses;
 using Application.DTOs;
+using Application.Filtering;
 using Infrastructure.Data;
 
 namespace Application.Services;
@@ -33,7 +34,9 @@ public class MatchResultService(IMapper mapper, ApplicationDbContext dbContext) 
     {
         try
         {
-            var matchResult = await _dbContext.MatchResults.FirstOrDefaultAsync(mr => mr.MatchId == matchId && mr.TeamId == teamId);
+            var matchResult = await _dbContext.MatchResults
+                .FirstOrDefaultAsync(x => x.MatchId == matchId && x.TeamId == teamId);
+
             if (matchResult == null)
                 return new Response<string>(HttpStatusCode.NotFound, "Rezultat matcha ne nayden!");
 
@@ -51,7 +54,9 @@ public class MatchResultService(IMapper mapper, ApplicationDbContext dbContext) 
     {
         try
         {
-            var matchResult = await _dbContext.MatchResults.FirstOrDefaultAsync(mr => mr.MatchId == matchId && mr.TeamId == teamId);
+            var matchResult = await _dbContext.MatchResults
+                .FirstOrDefaultAsync(x => x.MatchId == matchId && x.TeamId == teamId);
+
             if (matchResult == null)
                 return new Response<string>(HttpStatusCode.NotFound, "Rezultat matcha ne nayden!");
 
@@ -65,18 +70,40 @@ public class MatchResultService(IMapper mapper, ApplicationDbContext dbContext) 
         }
     }
 
-    public async Task<Response<List<MatchResult>>> GetMatchResults()
+    public async Task<Response<PagedResult<MatchResult>>> GetMatchResultsPaged(PagedQuery query)
     {
         try
         {
-            var matchResults = await _dbContext.MatchResults.ToListAsync();
-            var response = new Response<List<MatchResult>>(HttpStatusCode.OK, "Rezultaty matchey polucheny");
-            response.Data = matchResults;
-            return response;
+            query.Page = query.Page < 1 ? 1 : query.Page;
+            query.PageSize = query.PageSize < 1 ? 20 : query.PageSize;
+            query.PageSize = query.PageSize > 100 ? 100 : query.PageSize;
+
+            IQueryable<MatchResult> matchResults =
+                _dbContext.MatchResults.AsNoTracking();
+
+            var totalCount = await matchResults.CountAsync();
+
+            var items = await matchResults
+                .OrderByDescending(x => x.MatchId)
+                .ThenBy(x => x.TeamId)
+                .Skip((query.Page - 1) * query.PageSize)
+                .Take(query.PageSize)
+                .ToListAsync();
+
+            var result = new PagedResult<MatchResult>
+            {
+                Items = items,
+                Page = query.Page,
+                PageSize = query.PageSize,
+                TotalCount = totalCount,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)query.PageSize)
+            };
+
+            return new Response<PagedResult<MatchResult>>(HttpStatusCode.OK, "Rezultaty polucheny", result);
         }
         catch (Exception ex)
         {
-            return new Response<List<MatchResult>>(HttpStatusCode.InternalServerError, ex.Message);
+            return new Response<PagedResult<MatchResult>>(HttpStatusCode.InternalServerError, ex.Message);
         }
     }
 
@@ -84,7 +111,9 @@ public class MatchResultService(IMapper mapper, ApplicationDbContext dbContext) 
     {
         try
         {
-            var matchResult = await _dbContext.MatchResults.FirstOrDefaultAsync(mr => mr.MatchId == matchId && mr.TeamId == teamId);
+            var matchResult = await _dbContext.MatchResults
+                .FirstOrDefaultAsync(x => x.MatchId == matchId && x.TeamId == teamId);
+
             if (matchResult == null)
                 return new Response<MatchResult>(HttpStatusCode.NotFound, "Rezultat matcha ne nayden!");
 
@@ -94,5 +123,10 @@ public class MatchResultService(IMapper mapper, ApplicationDbContext dbContext) 
         {
             return new Response<MatchResult>(HttpStatusCode.InternalServerError, ex.Message);
         }
+    }
+
+    public Task<Response<List<MatchResult>>> GetMatchResults()
+    {
+        throw new NotImplementedException();
     }
 }
