@@ -5,6 +5,7 @@ using Domain.Models;
 using Application.Interfaces;
 using Application.Responses;
 using Application.DTOs;
+using Application.Filtering;
 using Infrastructure.Data;
 
 namespace Application.Services;
@@ -35,7 +36,7 @@ public class TeamService(IMapper mapper, ApplicationDbContext dbContext) : ITeam
         {
             var team = await _dbContext.Teams.FindAsync(teamId);
             if (team == null)
-                return new Response<string>(HttpStatusCode.NotFound, "Komanda ne naydenа!");
+                return new Response<string>(HttpStatusCode.NotFound, "Komanda ne naydena!");
 
             _mapper.Map(teamDto, team);
             await _dbContext.SaveChangesAsync();
@@ -53,7 +54,7 @@ public class TeamService(IMapper mapper, ApplicationDbContext dbContext) : ITeam
         {
             var team = await _dbContext.Teams.FindAsync(teamId);
             if (team == null)
-                return new Response<string>(HttpStatusCode.NotFound, "Komanda ne naydenа!");
+                return new Response<string>(HttpStatusCode.NotFound, "Komanda ne naydena!");
 
             _dbContext.Teams.Remove(team);
             await _dbContext.SaveChangesAsync();
@@ -69,10 +70,11 @@ public class TeamService(IMapper mapper, ApplicationDbContext dbContext) : ITeam
     {
         try
         {
-            var teams = await _dbContext.Teams.ToListAsync();
-            var response = new Response<List<Team>>(HttpStatusCode.OK, "Komandy polucheny");
-            response.Data = teams;
-            return response;
+            var teams = await _dbContext.Teams
+                .AsNoTracking()
+                .ToListAsync();
+
+            return new Response<List<Team>>(HttpStatusCode.OK, "Komandy polucheny", teams);
         }
         catch (Exception ex)
         {
@@ -84,15 +86,54 @@ public class TeamService(IMapper mapper, ApplicationDbContext dbContext) : ITeam
     {
         try
         {
-            var team = await _dbContext.Teams.FirstOrDefaultAsync(t => t.Id == teamId);
+            var team = await _dbContext.Teams
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == teamId);
+
             if (team == null)
-                return new Response<Team>(HttpStatusCode.NotFound, "Komanda ne naydenа!");
+                return new Response<Team>(HttpStatusCode.NotFound, "Komanda ne naydena!");
 
             return new Response<Team>(HttpStatusCode.OK, "Komanda poluchena", team);
         }
         catch (Exception ex)
         {
             return new Response<Team>(HttpStatusCode.InternalServerError, ex.Message);
+        }
+    }
+
+    public async Task<Response<PagedResult<Team>>> GetTeamsPaged(PagedQuery query)
+    {
+        try
+        {
+            query.Page = query.Page < 1 ? 1 : query.Page;
+            query.PageSize = query.PageSize < 1 ? 20 : query.PageSize;
+            query.PageSize = query.PageSize > 100 ? 100 : query.PageSize;
+
+            IQueryable<Team> teams =
+                _dbContext.Teams.AsNoTracking();
+
+            var totalCount = await teams.CountAsync();
+
+            var items = await teams
+                .OrderByDescending(x => x.Id)
+                .Skip((query.Page - 1) * query.PageSize)
+                .Take(query.PageSize)
+                .ToListAsync();
+
+            var result = new PagedResult<Team>
+            {
+                Items = items,
+                Page = query.Page,
+                PageSize = query.PageSize,
+                TotalCount = totalCount,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)query.PageSize)
+            };
+
+            return new Response<PagedResult<Team>>(HttpStatusCode.OK, "Komandy s paginaciey polucheny", result);
+        }
+        catch (Exception ex)
+        {
+            return new Response<PagedResult<Team>>(HttpStatusCode.InternalServerError, ex.Message);
         }
     }
 }

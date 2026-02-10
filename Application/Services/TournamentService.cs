@@ -5,6 +5,7 @@ using Domain.Models;
 using Application.Interfaces;
 using Application.Responses;
 using Application.DTOs;
+using Application.Filtering;
 using Infrastructure.Data;
 
 namespace Application.Services;
@@ -69,10 +70,11 @@ public class TournamentService(IMapper mapper, ApplicationDbContext dbContext) :
     {
         try
         {
-            var tournaments = await _dbContext.Tournaments.ToListAsync();
-            var response = new Response<List<Tournament>>(HttpStatusCode.OK, "Turniry polucheny");
-            response.Data = tournaments;
-            return response;
+            var tournaments = await _dbContext.Tournaments
+                .AsNoTracking()
+                .ToListAsync();
+
+            return new Response<List<Tournament>>(HttpStatusCode.OK, "Turniry polucheny", tournaments);
         }
         catch (Exception ex)
         {
@@ -84,7 +86,10 @@ public class TournamentService(IMapper mapper, ApplicationDbContext dbContext) :
     {
         try
         {
-            var tournament = await _dbContext.Tournaments.FirstOrDefaultAsync(t => t.Id == tournamentId);
+            var tournament = await _dbContext.Tournaments
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == tournamentId);
+
             if (tournament == null)
                 return new Response<Tournament>(HttpStatusCode.NotFound, "Turnir ne nayden!");
 
@@ -93,6 +98,42 @@ public class TournamentService(IMapper mapper, ApplicationDbContext dbContext) :
         catch (Exception ex)
         {
             return new Response<Tournament>(HttpStatusCode.InternalServerError, ex.Message);
+        }
+    }
+
+    public async Task<Response<PagedResult<Tournament>>> GetTournamentsPaged(PagedQuery query)
+    {
+        try
+        {
+            query.Page = query.Page < 1 ? 1 : query.Page;
+            query.PageSize = query.PageSize < 1 ? 20 : query.PageSize;
+            query.PageSize = query.PageSize > 100 ? 100 : query.PageSize;
+
+            IQueryable<Tournament> tournaments =
+                _dbContext.Tournaments.AsNoTracking();
+
+            var totalCount = await tournaments.CountAsync();
+
+            var items = await tournaments
+                .OrderByDescending(x => x.Id)
+                .Skip((query.Page - 1) * query.PageSize)
+                .Take(query.PageSize)
+                .ToListAsync();
+
+            var result = new PagedResult<Tournament>
+            {
+                Items = items,
+                Page = query.Page,
+                PageSize = query.PageSize,
+                TotalCount = totalCount,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)query.PageSize)
+            };
+
+            return new Response<PagedResult<Tournament>>(HttpStatusCode.OK, "Turniry s paginaciey polucheny", result);
+        }
+        catch (Exception ex)
+        {
+            return new Response<PagedResult<Tournament>>(HttpStatusCode.InternalServerError, ex.Message);
         }
     }
 }

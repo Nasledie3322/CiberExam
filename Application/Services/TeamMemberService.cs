@@ -5,6 +5,7 @@ using Domain.Models;
 using Application.Interfaces;
 using Application.Responses;
 using Application.DTOs;
+using Application.Filtering;
 using Infrastructure.Data;
 
 namespace Application.Services;
@@ -33,7 +34,9 @@ public class TeamMemberService(IMapper mapper, ApplicationDbContext dbContext) :
     {
         try
         {
-            var teamMember = await _dbContext.TeamMembers.FirstOrDefaultAsync(tm => tm.TeamId == teamId && tm.UserId == userId);
+            var teamMember = await _dbContext.TeamMembers
+                .FirstOrDefaultAsync(x => x.TeamId == teamId && x.UserId == userId);
+
             if (teamMember == null)
                 return new Response<string>(HttpStatusCode.NotFound, "Chlen komandy ne nayden!");
 
@@ -51,10 +54,11 @@ public class TeamMemberService(IMapper mapper, ApplicationDbContext dbContext) :
     {
         try
         {
-            var teamMembers = await _dbContext.TeamMembers.ToListAsync();
-            var response = new Response<List<TeamMember>>(HttpStatusCode.OK, "Chleny komand polucheny");
-            response.Data = teamMembers;
-            return response;
+            var members = await _dbContext.TeamMembers
+                .AsNoTracking()
+                .ToListAsync();
+
+            return new Response<List<TeamMember>>(HttpStatusCode.OK, "Chleny komand polucheny", members);
         }
         catch (Exception ex)
         {
@@ -66,7 +70,10 @@ public class TeamMemberService(IMapper mapper, ApplicationDbContext dbContext) :
     {
         try
         {
-            var teamMember = await _dbContext.TeamMembers.FirstOrDefaultAsync(tm => tm.TeamId == teamId && tm.UserId == userId);
+            var teamMember = await _dbContext.TeamMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.TeamId == teamId && x.UserId == userId);
+
             if (teamMember == null)
                 return new Response<TeamMember>(HttpStatusCode.NotFound, "Chlen komandy ne nayden!");
 
@@ -75,6 +82,43 @@ public class TeamMemberService(IMapper mapper, ApplicationDbContext dbContext) :
         catch (Exception ex)
         {
             return new Response<TeamMember>(HttpStatusCode.InternalServerError, ex.Message);
+        }
+    }
+
+    public async Task<Response<PagedResult<TeamMember>>> GetTeamMembersPaged(PagedQuery query)
+    {
+        try
+        {
+            query.Page = query.Page < 1 ? 1 : query.Page;
+            query.PageSize = query.PageSize < 1 ? 20 : query.PageSize;
+            query.PageSize = query.PageSize > 100 ? 100 : query.PageSize;
+
+            IQueryable<TeamMember> members =
+                _dbContext.TeamMembers.AsNoTracking();
+
+            var totalCount = await members.CountAsync();
+
+            var items = await members
+                .OrderBy(x => x.TeamId)
+                .ThenBy(x => x.UserId)
+                .Skip((query.Page - 1) * query.PageSize)
+                .Take(query.PageSize)
+                .ToListAsync();
+
+            var result = new PagedResult<TeamMember>
+            {
+                Items = items,
+                Page = query.Page,
+                PageSize = query.PageSize,
+                TotalCount = totalCount,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)query.PageSize)
+            };
+
+            return new Response<PagedResult<TeamMember>>(HttpStatusCode.OK, "Chleny komand s paginaciey polucheny", result);
+        }
+        catch (Exception ex)
+        {
+            return new Response<PagedResult<TeamMember>>(HttpStatusCode.InternalServerError, ex.Message);
         }
     }
 }

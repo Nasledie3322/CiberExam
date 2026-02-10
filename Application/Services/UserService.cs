@@ -5,6 +5,7 @@ using Domain.Models;
 using Application.Interfaces;
 using Application.Responses;
 using Application.DTOs;
+using Application.Filtering;
 using Infrastructure.Data;
 
 namespace Application.Services;
@@ -69,10 +70,10 @@ public class UserService(IMapper mapper, ApplicationDbContext dbContext) : IUser
     {
         try
         {
-            var users = await _dbContext.Users.ToListAsync();
-            var response = new Response<List<User>>(HttpStatusCode.OK, "Polzovateli polucheny");
-            response.Data = users;
-            return response;
+            var users = await _dbContext.Users
+                .AsNoTracking()
+                .ToListAsync();
+            return new Response<List<User>>(HttpStatusCode.OK, "Polzovateli polucheny", users);
         }
         catch (Exception ex)
         {
@@ -84,15 +85,50 @@ public class UserService(IMapper mapper, ApplicationDbContext dbContext) : IUser
     {
         try
         {
-            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            var user = await _dbContext.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null)
                 return new Response<User>(HttpStatusCode.NotFound, "Polzovatel ne nayden!");
-
             return new Response<User>(HttpStatusCode.OK, "Polzovatel poluchen", user);
         }
         catch (Exception ex)
         {
             return new Response<User>(HttpStatusCode.InternalServerError, ex.Message);
+        }
+    }
+
+    public async Task<Response<PagedResult<User>>> GetUsersPaged(PagedQuery query)
+    {
+        try
+        {
+            query.Page = query.Page < 1 ? 1 : query.Page;
+            query.PageSize = query.PageSize < 1 ? 20 : query.PageSize;
+            query.PageSize = query.PageSize > 100 ? 100 : query.PageSize;
+
+            IQueryable<User> users = _dbContext.Users.AsNoTracking();
+            var totalCount = await users.CountAsync();
+
+            var items = await users
+                .OrderBy(u => u.Id)
+                .Skip((query.Page - 1) * query.PageSize)
+                .Take(query.PageSize)
+                .ToListAsync();
+
+            var result = new PagedResult<User>
+            {
+                Items = items,
+                Page = query.Page,
+                PageSize = query.PageSize,
+                TotalCount = totalCount,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)query.PageSize)
+            };
+
+            return new Response<PagedResult<User>>(HttpStatusCode.OK, "Polzovateli s paginaciey polucheny", result);
+        }
+        catch (Exception ex)
+        {
+            return new Response<PagedResult<User>>(HttpStatusCode.InternalServerError, ex.Message);
         }
     }
 }
