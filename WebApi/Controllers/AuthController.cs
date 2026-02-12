@@ -1,44 +1,55 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
+using Application.Interfaces;
+using System.Threading.Tasks;
 
 [ApiController]
-[Route("auth")]
+[Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
-    private readonly IConfiguration _config;
+    private readonly IAuthService _authService;
 
-    public AuthController(IConfiguration config)
+    public AuthController(IAuthService authService)
     {
-        _config = config;
+        _authService = authService;
     }
 
-    [HttpGet("login/{username}")]
-    public IActionResult Login(string username)
+    [HttpPost("register")]
+    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
-        var claims = new List<Claim>
+        try
         {
-            new Claim(ClaimTypes.Name, username)
-        };
-
-        var key = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
-
-        var creds = new SigningCredentials(
-            key, SecurityAlgorithms.HmacSha256);
-
-        var token = new JwtSecurityToken(
-            issuer: _config["Jwt:Issuer"],
-            audience: _config["Jwt:Audience"],
-            claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(30),
-            signingCredentials: creds
-        );
-
-        var jwt = new JwtSecurityTokenHandler().WriteToken(token);
-
-        return Ok(jwt);
+            var token = await _authService.Register(request.Username, request.Password);
+            return Ok(new { Token = token });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Error = ex.Message });
+        }
     }
+
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    {
+        try
+        {
+            var token = await _authService.Login(request.Username, request.Password);
+            return Ok(new { Token = token });
+        }
+        catch (Exception ex)
+        {
+            return Unauthorized(new { Error = ex.Message });
+        }
+    }
+}
+
+public class RegisterRequest
+{
+    public string Username { get; set; } = null!;
+    public string Password { get; set; } = null!;
+}
+
+public class LoginRequest
+{
+    public string Username { get; set; } = null!;
+    public string Password { get; set; } = null!;
 }
