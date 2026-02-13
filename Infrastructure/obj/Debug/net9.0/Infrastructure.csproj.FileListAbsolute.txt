@@ -15,3 +15,4 @@ C:\Users\user\Desktop\CiberExam\Infrastructure\obj\Debug\net9.0\refint\Infrastru
 C:\Users\user\Desktop\CiberExam\Infrastructure\obj\Debug\net9.0\Infrastructure.pdb
 C:\Users\user\Desktop\CiberExam\Infrastructure\obj\Debug\net9.0\Infrastructure.genruntimeconfig.cache
 C:\Users\user\Desktop\CiberExam\Infrastructure\obj\Debug\net9.0\ref\Infrastructure.dll
+C:\Users\user\Desktop\CiberExam\Infrastructure\obj\Debug\net9.0\Infrastructure.sourcelink.json
