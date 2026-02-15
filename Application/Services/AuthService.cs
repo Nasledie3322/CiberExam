@@ -1,6 +1,10 @@
 using Application.Interfaces;
 using Infrastructure.Data;
 using Microsoft.AspNetCore.Identity;
+using System.Threading.Tasks;
+
+namespace Application.Services;
+
 public class AuthService : IAuthService
 {
     private readonly IJwtService _jwtService;
@@ -12,7 +16,7 @@ public class AuthService : IAuthService
         _userManager = userManager;
     }
 
-    public async Task<string> Register(string username, string password)
+    public async Task<string> Register(string username, string password, string role)
     {
         var user = new ApplicationUser { UserName = username };
         var result = await _userManager.CreateAsync(user, password);
@@ -22,7 +26,9 @@ public class AuthService : IAuthService
             throw new Exception(string.Join(", ", result.Errors.Select(e => e.Description)));
         }
 
-        return _jwtService.GenerateToken(user.Id, username);
+        await _userManager.AddToRoleAsync(user, role ?? "User");
+
+        return await _jwtService.GenerateToken(user);
     }
 
     public async Task<string> Login(string username, string password)
@@ -33,6 +39,6 @@ public class AuthService : IAuthService
         var passwordValid = await _userManager.CheckPasswordAsync(user, password);
         if (!passwordValid) throw new Exception("Neverniy parol");
 
-        return _jwtService.GenerateToken(user.Id, username);
+        return await _jwtService.GenerateToken(user);
     }
 }

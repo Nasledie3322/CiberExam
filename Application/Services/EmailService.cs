@@ -1,3 +1,11 @@
+using Application.Interfaces;
+using System.Net;
+using System.Net.Mail;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+
+namespace Application.Services;
+
 public class EmailService : IEmailService
 {
     private readonly EmailSettings _settings;
@@ -25,4 +33,12 @@ public class EmailService : IEmailService
 
         await client.SendMailAsync(message);
     }
+}
+
+public class EmailSettings
+{
+    public string Email { get; set; } = null!;
+    public string Host { get; set; } = null!;
+    public int Port { get; set; }
+    public string Password { get; set; } = null!;
 }

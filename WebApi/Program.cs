@@ -6,8 +6,8 @@ using Microsoft.AspNetCore.Identity;
 using Application.Interfaces;
 using Application.Services;
 using Infrastructure.Data;
+using Infrastructure.Configurations;
 using System.Text;
-using Api.Configurations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -94,5 +94,17 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+using (var scope = app.Services.CreateScope())
+{
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
-app.Run();
+    var roles = new[] { "Admin", "User" };
+
+    foreach (var role in roles)
+    {
+        if (!roleManager.RoleExistsAsync(role).Result)
+            roleManager.CreateAsync(new IdentityRole(role)).Wait();
+    }
+}
+
+await app.RunAsync();

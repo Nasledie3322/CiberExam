@@ -1,4 +1,9 @@
+using System.Threading.Tasks;
+using Infrastructure.Data;
+
+namespace Application.Interfaces;
+
 public interface IJwtService
 {
-    string GenerateToken(string userId, string userName);
+    Task<string> GenerateToken(ApplicationUser user);
 }

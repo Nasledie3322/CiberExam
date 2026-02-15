@@ -2,24 +2,36 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using Api.Configurations;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
+using Infrastructure.Configurations;
+using Infrastructure.Data;
+using Application.Interfaces;
+
+namespace Application.Services;
 
 public class JwtService : IJwtService
 {
     private readonly JwtSettings _jwtSettings;
+    private readonly UserManager<ApplicationUser> _userManager;
 
-    public JwtService(JwtSettings jwtSettings)
+    public JwtService(JwtSettings jwtSettings, UserManager<ApplicationUser> userManager)
     {
         _jwtSettings = jwtSettings;
+        _userManager = userManager;
     }
 
-    public string GenerateToken(string userId, string userName)
+    public async Task<string> GenerateToken(ApplicationUser user)
     {
-        var claims = new[]
+        var roles = await _userManager.GetRolesAsync(user);
+
+        var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, userId),
-            new Claim(JwtRegisteredClaimNames.UniqueName, userName)
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id),
+            new Claim(JwtRegisteredClaimNames.UniqueName, user.UserName)
         };
+
+        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Key));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

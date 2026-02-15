@@ -1,6 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Application.Interfaces;
+using Application.DTOs;
 using System.Threading.Tasks;
+using System;
+
+namespace WebApi.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -18,7 +22,7 @@ public class AuthController : ControllerBase
     {
         try
         {
-            var token = await _authService.Register(request.Username, request.Password);
+            var token = await _authService.Register(request.Username, request.Password, request.Role);
             return Ok(new { Token = token });
         }
         catch (Exception ex)
@@ -40,16 +44,4 @@ public class AuthController : ControllerBase
             return Unauthorized(new { Error = ex.Message });
         }
     }
-}
-
-public class RegisterRequest
-{
-    public string Username { get; set; } = null!;
-    public string Password { get; set; } = null!;
-}
-
-public class LoginRequest
-{
-    public string Username { get; set; } = null!;
-    public string Password { get; set; } = null!;
 }
